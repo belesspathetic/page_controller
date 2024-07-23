@@ -1,0 +1,4 @@
+[workspace]
+members = ["back", "front", "shared", "tasks"]
+
+resolver = "2"
