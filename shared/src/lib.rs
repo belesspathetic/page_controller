@@ -1,14 +1,26 @@
-use reqwest::{Client, Error};
+use reqwest::{Client, Error, StatusCode};
+use consts::{FB_URL, GRAPH_URL};
 
-const BASE_URL: &str = "https://facebook.com";
+pub mod consts;
 
-pub async fn fb_health_check() -> Result<(), Error> {
+
+
+pub async fn fb_health_check() -> Result<StatusCode, Error> {
     let cl = Client::new();
-    let resp = cl.get(BASE_URL).send().await?;
+    let resp = cl.get(FB_URL).send().await?;
+
+    dbg!(&resp);
+    Ok(resp.status())
+}
+
+pub async fn fb_get_me() -> Result<(), Error> {
+    let cl = Client::new();
+    let resp = cl.get(format!("{}me", GRAPH_URL)).send().await?;
 
     dbg!(resp);
 
     Ok(())
 }
+
 
 
