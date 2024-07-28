@@ -1,4 +1,5 @@
-use shared::fb_health_check;
+use reqwest::StatusCode;
+use shared::api::health_api::fb_health_check_api;
 use sycamore::prelude::*;
 use sycamore::suspense::Suspense;
 use front::home::Home;
@@ -30,20 +31,6 @@ fn App<G: Html>() -> View<G> {
     let local_storage = window.local_storage().expect("local storage not set").unwrap();
     
 
-
-    // let dark_mode = match local_storage.get_item("dark_mode") {
-
-    // }
-
-    
-    // if dark_mode.is_empty() {
-    //     local_storage.set_item("dark_mode", "false").unwrap();
-    // } else if dark_mode == "false".to_string() {
-    //     DarkMode(create_signal(false));
-    // } else {
-    //     DarkMode(create_signal(true));
-    // }
-
     
     view! {
         Home()
@@ -58,8 +45,9 @@ fn App<G: Html>() -> View<G> {
 
 #[component]
 async fn Health<G: Html>() -> View<G> {
-    match fb_health_check().await {
+    match fb_health_check_api().await {
         Ok(_) => view! {p() {"200"}},
         Err(_) => view! {p() {"400"}},
     }
 }
+
