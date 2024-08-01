@@ -12,7 +12,11 @@ async fn get_fb() {
 #[tokio::test]
 async fn get_graph() {
     let cl = reqwest::Client::new();
-    let resp = cl.get(format!("{}me", GRAPH_URL)).send().await.expect("failed to send reqwest");
+    let resp = cl
+        .get(format!("{}me", GRAPH_URL))
+        .send()
+        .await
+        .expect("failed to send reqwest");
 
     dbg!(&resp);
     assert_eq!(resp.status(), 400);

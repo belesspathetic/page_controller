@@ -10,8 +10,8 @@ async fn fb_health_handler() -> impl Responder {
     let status = fb_health_check().await;
 
     let response = match status {
-        Ok(_) => HttpResponse::Ok().finish(),           // Status 200 OK
-        Err(_) => HttpResponse::BadRequest().finish(),  // Status 400 Bad Request
+        Ok(_) => HttpResponse::Ok().finish(),          // Status 200 OK
+        Err(_) => HttpResponse::BadRequest().finish(), // Status 400 Bad Request
     };
 
     response
@@ -22,7 +22,7 @@ pub fn run(address: &str) -> Result<Server, std::io::Error> {
         let cors = Cors::default()
             .allow_any_origin() // Allow requests from any source
             .allow_any_method() // Allow any HTTP method
-            .allow_any_header();    // Allow any headers
+            .allow_any_header(); // Allow any headers
         App::new()
             .wrap(cors)
             .route("/", web::get().to(own_health_check_handler))

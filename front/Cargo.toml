@@ -10,7 +10,9 @@ log = "0.4.22"
 reqwest = "0.12.5"
 # shared
 shared = { path = "../shared" }
-sycamore = { git = "https://github.com/sycamore-rs/sycamore", rev = "90356a7851d5222eecbd04a2a5b606ee4663d1a7", features = ["suspense"]}
+sycamore = { git = "https://github.com/sycamore-rs/sycamore", rev = "b5ce9d57a23ede25a8fa1615b3cb07e3aa29fd3b", features = ["suspense"]}
+# sycamore = { version = "0.9.0-beta.2", features = ["suspense"]}
+# sycamore-router = "0.9.0-beta.2"
 
 [dependencies.web-sys]
 version = "0.3.69"

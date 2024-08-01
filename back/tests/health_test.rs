@@ -49,7 +49,7 @@ async fn fb_health_check_works() {
 
     // Set endpoint
     let endpoint = format!("{}/fb_health_check", app.address);
-    
+
     let resp = cl
         .get(endpoint)
         .send()
