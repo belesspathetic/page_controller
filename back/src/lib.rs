@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{dev::Server, web, App, HttpResponse, HttpServer, Responder};
+use markdown::to_html;
 use shared::fb_health_check;
 
 async fn own_health_check_handler() -> impl Responder {
@@ -17,6 +18,15 @@ async fn fb_health_handler() -> impl Responder {
     response
 }
 
+async fn patchnote() -> impl Responder {
+    // Замените путь к вашему Markdown-файлу
+    let markdown_content = std::fs::read_to_string("patchnote.md")
+        .expect("Unable to read file");
+    let html_content = to_html(&markdown_content);
+
+    HttpResponse::Ok().body(html_content)
+}
+
 pub fn run(address: &str) -> Result<Server, std::io::Error> {
     let server = HttpServer::new(|| {
         let cors = Cors::default()
@@ -27,6 +37,7 @@ pub fn run(address: &str) -> Result<Server, std::io::Error> {
             .wrap(cors)
             .route("/", web::get().to(own_health_check_handler))
             .route("/fb_health_check", web::get().to(fb_health_handler))
+            .route("/patchnote", web::get().to(patchnote))
     })
     .bind(address)?
     .run();

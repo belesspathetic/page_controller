@@ -5,13 +5,10 @@ use web_sys::window;
 use front::components::adder::Adder;
 use front::components::dm::DarkMode;
 
-
 use shared::api::health_api::fb_health_check_api;
 
-
-
 const BODY_CLASS: &str =
-    "antialiased transition-colors text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800";
+    "antialiased transition-colors text-zinc-500 dark:text-zinc-400 bg-[#fafafa] dark:bg-zinc-800";
 
 fn main() {
     // logging
@@ -39,7 +36,6 @@ fn App<G: Html>() -> View<G> {
     } else {
         false
     };
-
     let dark_mode = DarkMode(create_signal(dark_mode));
     provide_context(dark_mode);
 
@@ -64,21 +60,11 @@ fn App<G: Html>() -> View<G> {
         }
     });
 
-    
-
     view! {
         Home()
         Adder()
     }
-    
-    
-    
-    
-    
-    
-                
 }
-
 
 #[component]
 async fn Health<G: Html>() -> View<G> {
