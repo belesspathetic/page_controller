@@ -1,5 +1,7 @@
 use crate::components::header::Header;
 use crate::components::spark::Spark;
+use crate::components::elements::Elements;
+
 use sycamore::prelude::*;
 
 #[component]
@@ -8,5 +10,6 @@ pub fn Home<G: Html>() -> View<G> {
     view! {
         Header(on_close=on_click)
         Spark()
+        Elements()
     }
 }

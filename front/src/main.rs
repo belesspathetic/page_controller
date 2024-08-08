@@ -1,5 +1,6 @@
 use front::pages::home::Home;
 use sycamore::prelude::*;
+use web_sys::wasm_bindgen::UnwrapThrowExt;
 use web_sys::window;
 
 use front::components::adder::Adder;
@@ -20,18 +21,19 @@ fn main() {
 
 #[component]
 fn App<G: Html>() -> View<G> {
+    let on_close = create_signal(false);
     // set body css class
-    let window = window().expect("window not set");
+    let window = window().unwrap_throw();
 
-    let document = window.document().expect("document not set");
-    let body = document.body().expect("body not set");
+    let document = window.document().unwrap_throw();
+    let body = document.body().unwrap_throw();
     body.set_class_name(BODY_CLASS);
 
     // local storage
-    let local_storage = window.local_storage().unwrap();
-
+    let local_storage = window.local_storage().unwrap_throw();
+    
     let dark_mode = if let Some(local_storage) = &local_storage {
-        let dark_mode_key = local_storage.get_item("dark_mode").unwrap();
+        let dark_mode_key = local_storage.get_item("dark_mode").unwrap_throw();
         dark_mode_key.as_deref() == Some("true") || (dark_mode_key.is_none())
     } else {
         false
@@ -60,9 +62,10 @@ fn App<G: Html>() -> View<G> {
         }
     });
 
+
     view! {
         Home()
-        Adder()
+        Adder(on_close=on_close)
     }
 }
 
@@ -72,4 +75,15 @@ async fn Health<G: Html>() -> View<G> {
         Ok(_) => view! {p() {"200"}},
         Err(_) => view! {p() {"400"}},
     }
+}
+
+pub fn get_keys() -> Vec<String> {
+    let window = window().unwrap_throw();
+    let local_storage = window.local_storage().unwrap_throw().unwrap_throw();
+
+    let string = local_storage.get_item("keys").unwrap_throw().unwrap();
+
+    let keys: Vec<String> = serde_json::from_str(&string).unwrap_or_else(|_| Vec::new());
+
+    keys
 }

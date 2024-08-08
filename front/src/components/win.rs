@@ -3,7 +3,6 @@ use sycamore::prelude::*;
 #[derive(Props)]
 pub struct ContentComponent<G: Html> {
     pub children: Children<G>,
-    #[prop(default)]
     pub on_close: Signal<bool>,
 }
 
@@ -12,6 +11,7 @@ pub fn Win<G: Html>(props: ContentComponent<G>) -> View<G> {
     let children = props.children.call();
 
     let on_close = props.on_close;
+
 
     view! {
         (if on_close.get() {

@@ -1,12 +1,33 @@
 use sycamore::prelude::*;
+use web_sys::{window, Storage};
+
+use super::win::ContentComponent;
+
 
 #[component]
-pub fn KeyForm<G: Html>() -> View<G> {
+pub fn KeyForm<G: Html>(props: ContentComponent<G>) -> View<G> {
     let value = create_signal(String::new());
-
+    let on_click = props.on_close;
     let on_submit = move |event: web_sys::SubmitEvent| {
+        
         event.prevent_default();
-        web_sys::console::log_1(&value.get_clone_untracked().into()); // Log value to console
+        // Log value to console
+        // web_sys::console::log_1(&value.get_clone_untracked().into()); 
+        let window = window().unwrap();
+        let storage = window.local_storage().unwrap().unwrap();
+
+        let mut current_vec = read_keys_json(&storage);
+
+        current_vec.push(value.to_string());
+
+        let new_vec = serde_json::to_string(&current_vec).unwrap();
+
+        storage.set_item("keys", new_vec.as_str()).unwrap();
+
+        value.set(String::new());
+
+        on_click.set(false);
+
     };
 
     view! {
@@ -14,7 +35,8 @@ pub fn KeyForm<G: Html>() -> View<G> {
             input(
                 bind:value=value,
                 class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-emerald-600",
-                placeholder="Enter Page Access Token"
+                placeholder="Enter Page Access Token",
+                required=true,
 
             ) {}
             button(
@@ -24,6 +46,15 @@ pub fn KeyForm<G: Html>() -> View<G> {
                 "Add"
             }
         }
-
     }
+}
+
+fn read_keys_json(local_storage: &Storage) -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Ok(Some(json_str)) = local_storage.get_item("keys") {
+        if let Ok(parsed_keys) = serde_json::from_str::<Vec<String>>(&json_str) {
+            keys = parsed_keys;
+        }
+    }
+    keys
 }

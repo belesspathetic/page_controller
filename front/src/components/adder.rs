@@ -4,7 +4,7 @@ use crate::components::{keyform::KeyForm, win::Win};
 
 use super::win::ContentComponent;
 
-const BUTTON_CLASS: &str = "w-full bg-blue-500 text-white font-semibold py-2 px-4
+const BUTTON_CLASS: &str = "w-full transition-colors bg-blue-500 text-white font-semibold py-2 px-4
     hover:bg-blue-600
     dark:bg-emerald-800 dark:hover:bg-emerald-900";
 
@@ -27,7 +27,7 @@ pub fn Adder<G: Html>(props: ContentComponent<G>) -> View<G> {
                 view! {
                     Portal(selector="body") {
                         Win(on_close=on_click) {
-                            KeyForm()
+                            KeyForm(on_close=on_click)
                         }
                     }
                 }
