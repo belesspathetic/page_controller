@@ -1,5 +1,5 @@
 use sycamore::prelude::*;
-
+use crate::components::inner::Inner;
 use crate::get_keys;
 
 #[component]
@@ -12,7 +12,9 @@ pub fn Elements<G: Html>() -> View<G> {
             Keyed(
                 iterable=*count,
                 view=|x| view! {
-                    li { (x) }
+                    li(class="bg-gray p-10 shadow-md w-full") { 
+                        Inner(key=x)
+                     }
                 },
                 key=|x| x.clone(),
             )

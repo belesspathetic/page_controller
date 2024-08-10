@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use actix_cors::Cors;
 use actix_web::{dev::Server, web, App, HttpResponse, HttpServer, Responder};
 use markdown::to_html;
-use shared::fb_health_check;
+use shared::{fb_get_me, fb_health_check};
 
 async fn own_health_check_handler() -> impl Responder {
     HttpResponse::Ok()
@@ -19,12 +21,20 @@ async fn fb_health_handler() -> impl Responder {
 }
 
 async fn patchnote() -> impl Responder {
-    // Замените путь к вашему Markdown-файлу
     let markdown_content = std::fs::read_to_string("patchnote.md")
         .expect("Unable to read file");
     let html_content = to_html(&markdown_content);
 
     HttpResponse::Ok().body(html_content)
+}
+
+async fn get_me(key: web::Query<HashMap<String, String>>) -> impl Responder {
+    let key = key.get("key").unwrap();
+    let resp = fb_get_me(key.clone()).await.unwrap();
+
+
+
+    HttpResponse::Ok().json(resp)
 }
 
 pub fn run(address: &str) -> Result<Server, std::io::Error> {
@@ -38,6 +48,7 @@ pub fn run(address: &str) -> Result<Server, std::io::Error> {
             .route("/", web::get().to(own_health_check_handler))
             .route("/fb_health_check", web::get().to(fb_health_handler))
             .route("/patchnote", web::get().to(patchnote))
+            .route("/get_me", web::get().to(get_me))
     })
     .bind(address)?
     .run();

@@ -77,13 +77,4 @@ async fn Health<G: Html>() -> View<G> {
     }
 }
 
-pub fn get_keys() -> Vec<String> {
-    let window = window().unwrap_throw();
-    let local_storage = window.local_storage().unwrap_throw().unwrap_throw();
 
-    let string = local_storage.get_item("keys").unwrap_throw().unwrap();
-
-    let keys: Vec<String> = serde_json::from_str(&string).unwrap_or_else(|_| Vec::new());
-
-    keys
-}
