@@ -3,7 +3,6 @@ use sycamore::prelude::*;
 
 #[component]
 pub async fn PatchNote<G: Html>() -> View<G> {
-    // let html_content = create_signal(String::new());
 
 
     
@@ -19,8 +18,7 @@ pub async fn PatchNote<G: Html>() -> View<G> {
         },
     };
 
-    
-    //html_content.set(html);
+
     view! {
         div(dangerously_set_inner_html=html.clone())
     }

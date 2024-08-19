@@ -18,7 +18,7 @@ pub async fn fb_health_check() -> Result<StatusCode, Error> {
 pub async fn fb_get_me(key: String) -> Result<Page, Error> {
     let cl = Client::new();
     let resp = cl.get(format!("{}me?fields=id,name,followers_count&access_token={}", GRAPH_URL, key)).send().await?;
-    dbg!(&resp);
+    //dbg!(&resp);
     let page = resp.json::<Page>().await?;
     
     Ok(page)

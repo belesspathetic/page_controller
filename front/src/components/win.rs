@@ -1,16 +1,12 @@
 use sycamore::prelude::*;
 
-#[derive(Props)]
-pub struct ContentComponent<G: Html> {
-    pub children: Children<G>,
-    pub on_close: Signal<bool>,
-}
+use crate::pages::home::HomeProps;
 
 #[component]
-pub fn Win<G: Html>(props: ContentComponent<G>) -> View<G> {
+pub fn Win<G: Html>(props: HomeProps<G>) -> View<G> {
     let children = props.children.call();
 
-    let on_close = props.on_close;
+    let on_close = props.on_click;
 
 
     view! {

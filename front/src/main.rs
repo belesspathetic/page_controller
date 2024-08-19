@@ -1,9 +1,9 @@
+use front::get_keys;
 use front::pages::home::Home;
 use sycamore::prelude::*;
 use web_sys::wasm_bindgen::UnwrapThrowExt;
 use web_sys::window;
 
-use front::components::adder::Adder;
 use front::components::dm::DarkMode;
 
 use shared::api::health_api::fb_health_check_api;
@@ -21,7 +21,6 @@ fn main() {
 
 #[component]
 fn App<G: Html>() -> View<G> {
-    let on_close = create_signal(false);
     // set body css class
     let window = window().unwrap_throw();
 
@@ -62,10 +61,10 @@ fn App<G: Html>() -> View<G> {
         }
     });
 
+    let keys = create_signal(get_keys());
 
     view! {
-        Home()
-        Adder(on_close=on_close)
+        Home(keys=keys)
     }
 }
 

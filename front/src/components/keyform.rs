@@ -1,13 +1,14 @@
 use sycamore::prelude::*;
 use web_sys::{window, Storage};
 
-use super::win::ContentComponent;
+use crate::pages::home::HomeProps;
 
 
 #[component]
-pub fn KeyForm<G: Html>(props: ContentComponent<G>) -> View<G> {
+pub fn KeyForm<G: Html>(props: HomeProps<G>) -> View<G> {
     let value = create_signal(String::new());
-    let on_click = props.on_close;
+    let on_click = props.on_click;
+    let update_keys = props.update_keys;
     let on_submit = move |event: web_sys::SubmitEvent| {
         
         event.prevent_default();
@@ -24,7 +25,13 @@ pub fn KeyForm<G: Html>(props: ContentComponent<G>) -> View<G> {
 
         storage.set_item("keys", new_vec.as_str()).unwrap();
 
+        if let Some(ref update_fn) = update_keys {
+            update_fn(value.get_clone_untracked());
+        }
+
         value.set(String::new());
+
+        
 
         on_click.set(false);
 
