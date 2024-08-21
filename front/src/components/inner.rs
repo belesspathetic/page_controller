@@ -6,6 +6,7 @@ use shared::models::{ManualData, Page};
 use shared::api::manual_upload_api::manual_upload_api;
 use web_sys::{wasm_bindgen::JsValue, Event};
 
+use crate::components::manualstatus::{ManualLabel, ManualStatus};
 use crate::components::{elements::CurrentKey, win::Win};
 
 #[derive(Props)]
@@ -82,10 +83,14 @@ pub async fn AsyncMe<G: Html>(props: InnerComponent<G>) -> View<G> {
 #[component]
 pub fn Upload<G: Html>(props: InnerComponent<G>) -> View<G> {
     let on_click = props.on_click;
-    
+    let key = props.key.clone();
 
     view! {
-        UploadButton(key=props.key.clone(), on_click=on_click)   
+        div(class="flex items-center space-x-4") {
+            ManualLabel()
+            ManualStatus(key=key)
+            UploadButton(key=props.key.clone(), on_click=on_click) 
+        }
     }
 }
 

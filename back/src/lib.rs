@@ -1,16 +1,15 @@
-use std::{collections::HashMap, env::current_dir, fs::File, io::Write, sync::{Arc, Mutex}};
-
+use std::{collections::HashMap, env::current_dir, fs::File, io::Write, thread::sleep, time::Duration};
 use actix_cors::Cors;
 use actix_web::{dev::Server, web, App, HttpResponse, HttpServer, Responder};
 use fb_poster::{utils::Secrets, video::Video};
 use markdown::to_html;
 use montage::{combine, scale};
-use process_table::{Process, Status};
+use shared::models::Status;
 use pytube::{download_audio, download_video, get_thumb_url, get_title};
 use shared::{fb_get_me, fb_health_check, models::ManualData};
 use tx::gen_text;
-use utils::{create_new_dir, is_directory_present, read_env};
-mod process_table;
+use utils::{create_new_dir, create_status_file, is_directory_present, is_status_file_exist, read_env, read_status, remove_status_file, update_status_file};
+pub mod process_table;
 mod utils;
 mod pytube;
 mod montage;
@@ -48,19 +47,12 @@ async fn get_me(key: web::Query<HashMap<String, String>>) -> impl Responder {
     HttpResponse::Ok().json(resp)
 }
 
-pub type ProcessTable = Arc<Mutex<HashMap<String, Process>>>;
-
 // Обработчик для запуска процесса
-async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTable>) -> impl Responder {
-    let mut store = store.lock().unwrap();
-    let key = data.key.clone().unwrap_or_default();
-    let process = Process::new(&key).await.unwrap();
-    store.insert(key.clone(), process);
 
-    dbg!(&data);
-    
-    let mut store_clone = store.clone();
-    
+async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
+    let key = data.key.clone().unwrap_or_default();
+
+
     tokio::spawn(async move {
         let resp = fb_get_me(key.clone()).await.unwrap();
         let id = resp.id;
@@ -69,35 +61,35 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
             let _ = create_new_dir(&id);
         }
 
+        if !is_status_file_exist(&id) {
+            create_status_file(&id);
+        }
 
         let temp_dir_path = current_dir().unwrap().join(&id).join("temp");
         let temp_dir_path_str = temp_dir_path.to_string_lossy().to_string();
-        // Get stream
+
+        // Обновляем статус на "Downloading"
+        update_status_file(&id, Status::Downloading);
+        
+
         let result = download_video(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await.unwrap();
 
-        if result == "None"{
-            println!("PROCESS: Video is unavalible... Skiping...");
-            if let Some(process) = store_clone.get_mut(&key) {
-                process.update_status(Status::Skipping);
-                println!("{:?}", store_clone)
-            }
+        if result == "None" {
+            println!("PROCESS: Video is unavailable... Skipping...");
+            // Обновляем статус на "Waiting"
+            update_status_file(&id, Status::Waiting);
             return;
         }
 
         let _ = download_audio(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await;
         let thumb_url = get_thumb_url(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await.unwrap();
-        //dbg!(&audio_stream);
-        
-        let vars = read_env();
-        dbg!(vars.clone());
-        
 
+        let vars = read_env();
         let thumb_path = temp_dir_path.join("thumb.png");
         let thumb_path_str = thumb_path.to_string_lossy().to_string();
         let mut thumb_file = File::create(&thumb_path).unwrap();
         let cl = reqwest::Client::new();
 
-        // Download thumb
         println!("PROCESS: Downloading thumb...");
         let resp = cl.get(thumb_url).send().await.unwrap().bytes().await.unwrap();
         thumb_file.write_all(&resp).unwrap();
@@ -106,6 +98,9 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
         let video_path = temp_dir_path.join("video_stream.mp4");
         let audio_path = temp_dir_path.join("audio_stream.mp4");
 
+        // Status montage
+        update_status_file(&id, Status::Montage);
+
         let output = combine(
             video_path,
             audio_path,
@@ -113,13 +108,12 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
             vars.ffmpeg.clone()
         )
         .await.unwrap();
-        let mut title = String::new();
 
-        if data.title.clone().unwrap() == "" {
-            title = format!("{} {}", get_title(&data.url.clone().unwrap()).await.unwrap(), &data.tags.clone().unwrap())
+        let title = if data.title.clone().unwrap() == "" {
+            format!("{} {}", get_title(&data.url.clone().unwrap()).await.unwrap(), &data.tags.clone().unwrap())
         } else {
-            title = format!("{} {}", data.title.clone().unwrap(), &data.tags.clone().unwrap())
-        }
+            format!("{} {}", data.title.clone().unwrap(), &data.tags.clone().unwrap())
+        };
 
         if data.montage_or_no_montage.clone().unwrap() == "montage" {
             let (top_text, bottom_text, font_size) = gen_text(&title.trim().to_string());
@@ -136,6 +130,10 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
             let path = output.to_string_lossy().to_string();
             println!("Uploading...");
 
+            // Status Uploading
+            update_status_file(&id, Status::Uploading);
+            
+
             let secrets = Secrets::new(&key, &id);
             if let Err(e) = Video::new(secrets.clone())
                     .local_video(path)
@@ -144,10 +142,11 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
                     .with_thumbnail(thumb_path_str)
                     .send()
                     .await {
-                    eprintln!("Failed to send video: {}", e);
-                }
-            
+                eprintln!("Failed to send video: {}", e);
+            }
         } else {
+            // Status Uploading
+            update_status_file(&id, Status::Uploading);
             let path = output.to_string_lossy().to_string();
             println!("Uploading...");
 
@@ -159,40 +158,51 @@ async fn manual_upload(data: web::Json<ManualData>, store: web::Data<ProcessTabl
                     .with_thumbnail(thumb_path_str)
                     .send()
                     .await {
-                    eprintln!("Failed to send video: {}", e);
-                }
-            
+                eprintln!("Failed to send video: {}", e);
+            }
         }
 
+        // Status Success
+        update_status_file(&id, Status::Success);
 
-        if let Some(process) = store_clone.get_mut(&key) {
-            process.update_status(Status::Success);
-            //println!("{:?}", store_clone)
-        }
+        sleep(Duration::from_secs(10));
+
+        remove_status_file(&id);
     });
 
     HttpResponse::Ok().json("Process started")
 }
 
 
+
 async fn get_status(
     query: web::Query<HashMap<String, String>>,
-    store: web::Data<ProcessTable>
 ) -> impl Responder {
     let key = match query.get("key") {
-        Some(k) => k,
+        Some(k) => k.clone(),
         None => return HttpResponse::BadRequest().body("Missing 'key' parameter"),
     };
 
-    let store = store.lock().unwrap();
-    match store.get(key) {
-        Some(process) => HttpResponse::Ok().json(process),
-        None => HttpResponse::NotFound().body("Process not found"),
+    let resp = fb_get_me(key.clone()).await.unwrap();
+    let id = resp.id;
+
+    let path = current_dir().unwrap().join(id).join("status.txt");
+    let path_str = path.to_string_lossy().to_string();
+
+
+    match read_status(path_str) {
+        Ok(st) => {
+            println!("Returning status: {:?}", st);
+            HttpResponse::Ok().json(st)
+        },
+        Err(_) => {
+            HttpResponse::Ok().json("Waiting".to_string())
+        }
     }
+
 }
 
 pub fn run(address: &str) -> Result<Server, std::io::Error> {
-    let store: ProcessTable = Arc::new(Mutex::new(HashMap::new()));
 
     let server = HttpServer::new(move || {
         let cors = Cors::default()
@@ -200,7 +210,6 @@ pub fn run(address: &str) -> Result<Server, std::io::Error> {
             .allow_any_method() // Allow any HTTP method
             .allow_any_header(); // Allow any headers
         App::new()
-            .app_data(web::Data::new(store.clone()))
             .wrap(cors)
             .route("/", web::get().to(own_health_check_handler))
             .route("/fb_health_check", web::get().to(fb_health_handler))

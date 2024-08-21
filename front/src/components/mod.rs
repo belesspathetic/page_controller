@@ -7,3 +7,4 @@ pub mod spark;
 pub mod win;
 pub mod elements;
 pub mod inner;
+pub mod manualstatus;

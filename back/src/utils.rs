@@ -1,6 +1,8 @@
 use std::env;
-use std::fs;
-
+use std::env::current_dir;
+use std::fs::{self, remove_file, File};
+use std::io::{BufRead, BufReader, Error, Read};
+use std::io::Write;
 
 
 pub fn is_directory_present(id: &String) -> bool {
@@ -22,7 +24,55 @@ pub fn create_new_dir(id: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+pub fn is_status_file_exist(id: &String) -> bool {
+    current_dir().unwrap().join(id).join("status.txt").is_file()
+}
+
+pub fn create_status_file(id: &String) {
+    let path = current_dir().unwrap().join(id).join("status.txt");
+    let _ = File::create(path);
+}
+
+pub fn update_status_file(id: &String, status: Status) {
+    let file_path = current_dir().unwrap().join(id).join("status.txt");
+    let mut lines = Vec::new();
+
+    let file = File::open(&file_path).unwrap();
+    let reader = BufReader::new(file);
+    lines.extend(reader.lines().filter_map(Result::ok));
+
+    if !lines.is_empty() {
+        lines[0] = status.to_string();
+    } else {
+        lines.push(status.to_string());
+    }
+
+    let mut file = File::create(&file_path).unwrap();
+    for line in lines {
+        writeln!(file, "{}", line).unwrap();
+    }
+
+}
+
+pub fn read_status(path: String) -> Result<String, Error> {
+    let mut file = File::open(path)?;
+    
+    // Создаем строку для хранения содержимого
+    let mut status = String::new();
+    
+    // Читаем содержимое файла в строку
+    let _ = file.read_to_string(&mut status);
+
+    Ok(status.trim().to_string())
+}
+
+pub fn remove_status_file(id: &String) {
+    let file_path = current_dir().unwrap().join(id).join("status.txt");
+    remove_file(file_path).unwrap();
+}
+
 use dotenv::dotenv;
+use shared::models::Status;
 
 #[derive(Debug, Clone)]
 pub struct Vars {

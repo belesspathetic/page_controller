@@ -98,3 +98,47 @@ impl Default for ManualData {
         }
     }
 }
+
+use std::{fmt, io::Error};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum Status {
+    Waiting,
+    Downloading,
+    Montage,
+    Uploading,
+    Success,
+}
+
+impl Status {
+    pub fn to_string(&self) -> String {
+        match self {
+            Status::Waiting => "Waiting".to_string(),
+            Status::Downloading => "Downloading".to_string(),
+            Status::Montage => "Montage".to_string(),
+            Status::Uploading => "Uploading".to_string(),
+            Status::Success => "Success".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Process {
+    pub status: Status,
+    pub key: Option<String>,
+}
+
+impl Process {
+    pub async fn new(key: &String) -> Result<Self, Error> {
+        Ok(
+            Process {
+                status: Status::Waiting,
+                key: Some(key.to_string()),
+            }
+        )
+    }
+
+    pub fn update_status(&mut self, new_status: Status) {
+        self.status = new_status;
+    }
+}
