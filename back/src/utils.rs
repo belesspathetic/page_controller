@@ -5,15 +5,28 @@ use std::io::{BufRead, BufReader, Error, Read};
 use std::io::Write;
 
 
-pub fn is_directory_present(id: &String) -> bool {
-    let current_dir = env::current_dir().expect("Failed to get current directory");
+pub async fn ensure_directory_structure(id: &String) -> Result<(), Box<dyn std::error::Error>> {
+    if !is_directory_present(id).await? {
+        create_new_dir(id).await?;
+    }
+
+    if !is_status_file_exist(id).await {
+        create_status_file(id);
+    }
+    Ok(())
+}
+
+
+pub async fn is_directory_present(id: &String) -> Result<bool, Box<dyn std::error::Error>> {
+    let current_dir = env::current_dir()?;
 
     let dir = current_dir.join(id);
 
-    dir.is_dir()
+
+    Ok(dir.is_dir())
 }
 
-pub fn create_new_dir(id: &str) -> Result<(), std::io::Error> {
+pub async fn create_new_dir(id: &str) -> Result<(), std::io::Error> {
     let current_dir = env::current_dir()?;
     
     let dir_path = current_dir.join(id);
@@ -24,7 +37,7 @@ pub fn create_new_dir(id: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn is_status_file_exist(id: &String) -> bool {
+pub async fn is_status_file_exist(id: &String) -> bool {
     current_dir().unwrap().join(id).join("status.txt").is_file()
 }
 
@@ -76,19 +89,19 @@ use shared::models::Status;
 
 #[derive(Debug, Clone)]
 pub struct Vars {
-    pub chromedriver: String,
+    //pub chromedriver: String,
     pub ffmpeg: String,
 }
 
 impl Vars {
     fn new() -> Self {
         dotenv().ok();
-        let chromedriver = std::env::var("CHROMEDRIVER").expect("env info: CHROMEDRIVER must be set.");
+        //let chromedriver = std::env::var("CHROMEDRIVER").expect("env info: CHROMEDRIVER must be set.");
         let ffmpeg = std::env::var("FFMPEG").expect("env info: FFMPEG must be set.");
 
 
         Self {
-            chromedriver: chromedriver,
+            //chromedriver: chromedriver,
             ffmpeg: ffmpeg,
         }
     }

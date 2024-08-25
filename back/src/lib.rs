@@ -8,8 +8,7 @@ use shared::models::Status;
 use pytube::{download_audio, download_video, get_thumb_url, get_title};
 use shared::{fb_get_me, fb_health_check, models::ManualData};
 use tx::gen_text;
-use utils::{create_new_dir, create_status_file, is_directory_present, is_status_file_exist, read_env, read_status, remove_status_file, update_status_file};
-pub mod process_table;
+use utils::{ensure_directory_structure, read_env, read_status, remove_status_file, update_status_file};
 mod utils;
 mod pytube;
 mod montage;
@@ -47,57 +46,57 @@ async fn get_me(key: web::Query<HashMap<String, String>>) -> impl Responder {
     HttpResponse::Ok().json(resp)
 }
 
-// Обработчик для запуска процесса
-
-async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
-    let key = data.key.clone().unwrap_or_default();
 
 
-    tokio::spawn(async move {
-        let resp = fb_get_me(key.clone()).await.unwrap();
+async fn download_thumbnail(thumb_url: &str, temp_dir_path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    let thumb_path = temp_dir_path.join("thumb.png");
+    let mut thumb_file = File::create(&thumb_path)?;
+    let client = reqwest::Client::new();
+    let resp = client.get(thumb_url).send().await?.bytes().await?;
+    thumb_file.write_all(&resp)?;
+    Ok(())
+}
+
+async fn process_montage(output: std::path::PathBuf, temp_dir_path: &std::path::Path, montage_or_no_montage: &str, title: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    if montage_or_no_montage == "montage" {
+        let vars = read_env();
+        let vars = vars.ffmpeg;
+        let (top_text, bottom_text, font_size) = gen_text(&title.trim().to_string());
+        let output = scale(output, temp_dir_path, top_text, bottom_text, font_size, vars).await?;
+        Ok(output)
+    } else {
+        Ok(output)
+    }
+}
+
+async fn process_upload(key: &String, url: &String, title: &String, tags: &String, montage_or_no_montage: &String) -> Result<(), Box<dyn std::error::Error>> {
+    let resp = fb_get_me(key.clone()).await.unwrap();
         let id = resp.id;
 
-        if !is_directory_present(&id) {
-            let _ = create_new_dir(&id);
-        }
-
-        if !is_status_file_exist(&id) {
-            create_status_file(&id);
-        }
+        let _ = ensure_directory_structure(&id).await;
 
         let temp_dir_path = current_dir().unwrap().join(&id).join("temp");
         let temp_dir_path_str = temp_dir_path.to_string_lossy().to_string();
 
-        // Обновляем статус на "Downloading"
         update_status_file(&id, Status::Downloading);
         
-
-        let result = download_video(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await.unwrap();
+        let result = download_video(&url, temp_dir_path_str.clone()).await.unwrap();
 
         if result == "None" {
             println!("PROCESS: Video is unavailable... Skipping...");
-            // Обновляем статус на "Waiting"
             update_status_file(&id, Status::Waiting);
-            return;
+            return Ok(());
         }
 
-        let _ = download_audio(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await;
-        let thumb_url = get_thumb_url(&data.url.clone().unwrap(), temp_dir_path_str.to_string()).await.unwrap();
+        let _ = download_audio(&url, temp_dir_path_str.clone()).await;
+        let thumb_url = get_thumb_url(&url, temp_dir_path_str).await.unwrap();
 
-        let vars = read_env();
         let thumb_path = temp_dir_path.join("thumb.png");
         let thumb_path_str = thumb_path.to_string_lossy().to_string();
-        let mut thumb_file = File::create(&thumb_path).unwrap();
-        let cl = reqwest::Client::new();
-
-        println!("PROCESS: Downloading thumb...");
-        let resp = cl.get(thumb_url).send().await.unwrap().bytes().await.unwrap();
-        thumb_file.write_all(&resp).unwrap();
-        println!("PROCESS: Downloading done...");
+        let _ = download_thumbnail(&thumb_url, &temp_dir_path).await;
 
         let video_path = temp_dir_path.join("video_stream.mp4");
         let audio_path = temp_dir_path.join("audio_stream.mp4");
-
         // Status montage
         update_status_file(&id, Status::Montage);
 
@@ -105,36 +104,18 @@ async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
             video_path,
             audio_path,
             &temp_dir_path,
-            vars.ffmpeg.clone()
         )
         .await.unwrap();
 
-        let title = if data.title.clone().unwrap() == "" {
-            format!("{} {}", get_title(&data.url.clone().unwrap()).await.unwrap(), &data.tags.clone().unwrap())
+        let title = if title.is_empty() {
+            format!("{} {}", get_title(&url).await.unwrap(), tags)
         } else {
-            format!("{} {}", data.title.clone().unwrap(), &data.tags.clone().unwrap())
+            format!("{} {}", title, tags)
         };
 
-        if data.montage_or_no_montage.clone().unwrap() == "montage" {
-            let (top_text, bottom_text, font_size) = gen_text(&title.trim().to_string());
-
-            let output = scale(
-                output,
-                &temp_dir_path,
-                top_text,
-                bottom_text,
-                font_size,
-                vars.ffmpeg.clone()
-            )
-            .await.unwrap();
-            let path = output.to_string_lossy().to_string();
-            println!("Uploading...");
-
-            // Status Uploading
-            update_status_file(&id, Status::Uploading);
-            
-
-            let secrets = Secrets::new(&key, &id);
+        let output = process_montage(output, &temp_dir_path, montage_or_no_montage.as_str(), title.as_str()).await;
+        let path = output.unwrap().to_string_lossy().to_string();
+        let secrets = Secrets::new(&key, &id);
             if let Err(e) = Video::new(secrets.clone())
                     .local_video(path)
                     .with_title(title.clone())
@@ -144,23 +125,6 @@ async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
                     .await {
                 eprintln!("Failed to send video: {}", e);
             }
-        } else {
-            // Status Uploading
-            update_status_file(&id, Status::Uploading);
-            let path = output.to_string_lossy().to_string();
-            println!("Uploading...");
-
-            let secrets = Secrets::new(&key, &id);
-            if let Err(e) = Video::new(secrets.clone())
-                    .local_video(path)
-                    .with_title(title.clone())
-                    .with_description(title)
-                    .with_thumbnail(thumb_path_str)
-                    .send()
-                    .await {
-                eprintln!("Failed to send video: {}", e);
-            }
-        }
 
         // Status Success
         update_status_file(&id, Status::Success);
@@ -168,6 +132,21 @@ async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
         sleep(Duration::from_secs(10));
 
         remove_status_file(&id);
+
+        Ok(())
+}
+
+async fn manual_upload(data: web::Json<ManualData>) -> impl Responder {
+    let key = data.key.clone().unwrap_or_default();
+    let url = data.url.clone().unwrap();
+    let title = data.title.clone().unwrap_or_default();
+    let tags = data.tags.clone().unwrap_or_default();
+    let montage_or_no_montage = data.montage_or_no_montage.clone().unwrap_or_default();
+
+    tokio::spawn(async move {
+        if let Err(e) = process_upload(&key, &url, &title, &tags, &montage_or_no_montage).await {
+            eprintln!("Error processing upload: {}", e);
+        }
     });
 
     HttpResponse::Ok().json("Process started")

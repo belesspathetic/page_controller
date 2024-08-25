@@ -3,6 +3,8 @@ use std::{
     process::Command,
 };
 
+use crate::utils::read_env;
+
 pub async fn scale(
     original_video_path: PathBuf,
     temp_dir_path: &Path,
@@ -91,10 +93,10 @@ pub async fn combine(
     video_stream_path: PathBuf,
     audio_stream_path: PathBuf,
     temp_dir_path: &Path,
-    ffmpeg: String
 ) -> anyhow::Result<PathBuf> {
     let output = temp_dir_path.join("output.mp4");
-
+    let env = read_env();
+    let ffmpeg = env.ffmpeg;
     // Combine
     let _ = Command::new(&ffmpeg)
         .arg("-y")
